@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Brand Search</title>
+  <link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+  <main>
+    <header class="top">
+      <div>
+        <h1>Brand Search</h1>
+        <p class="muted">Nhập URL → worker hỏi ChatGPT (tìm kiếm web) → tên brand, alias, domain chính thức, logo.</p>
+      </div>
+      <span id="workers" class="pill">Đang kiểm tra worker…</span>
+    </header>
+
+    <form id="form">
+      <input id="url" type="text" placeholder="https://www.example.com/" spellcheck="false" autocomplete="off" autofocus>
+      <button id="go" type="submit">Tìm brand</button>
+    </form>
+
+    <section id="job" class="job" hidden>
+      <div class="job-head">
+        <span id="job-url" class="job-url"></span>
+        <button id="cancel" type="button" class="secondary" hidden>Hủy</button>
+      </div>
+      <p id="progress" class="progress" hidden><span class="spinner"></span><span id="progress-text"></span></p>
+      <p id="error" class="error" hidden></p>
+      <details id="answer" hidden><summary>Câu trả lời gốc của ChatGPT</summary><pre id="answer-text"></pre></details>
+    </section>
+
+    <section id="result" class="card" hidden></section>
+    <details id="raw" hidden><summary>JSON kết quả</summary><pre id="raw-json"></pre></details>
+
+    <h2 class="history-title">Lịch sử tra cứu</h2>
+    <table class="history">
+      <thead><tr><th>Lúc</th><th>URL</th><th>Brand</th><th>Trạng thái</th></tr></thead>
+      <tbody id="history"></tbody>
+    </table>
+  </main>
+  <script src="/static/app.js"></script>
+</body>
+</html>

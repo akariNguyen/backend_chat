@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <title>Brand Search Worker</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <header>
+    <h1>Brand Search Worker</h1>
+    <label class="switch"><input id="enabled" type="checkbox"> <span id="enabled-text">Bật</span></label>
+  </header>
+
+  <dl>
+    <dt>Worker ID</dt><dd id="worker-id">…</dd>
+    <dt>Trạng thái</dt><dd id="state">…</dd>
+  </dl>
+  <p id="backend-error" class="error" hidden></p>
+
+  <button id="lookup" type="button">Tra brand trang này</button>
+  <p class="links"><a id="open" href="#">Mở trang tra cứu</a></p>
+
+  <h2>Nhật ký</h2>
+  <ol id="log" class="log"></ol>
+  <script src="popup.js"></script>
+</body>
+</html>

@@ -1,0 +1,13 @@
+# job history (URLs looked up and ChatGPT's answers): local data, not code
+backend/brand_jobs.sqlite3
+*.sqlite3
+*.sqlite3-journal
+
+__pycache__/
+*.pyc
+.venv/
+venv/
+.env
+
+# test output
+tests/_out/

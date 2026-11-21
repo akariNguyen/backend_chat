@@ -1,0 +1,14 @@
+{
+  "manifest_version": 3,
+  "name": "Brand Search Worker (BKB)",
+  "version": "4.0.0",
+  "description": "Worker: nhận việc tra brand từ backend, mở ChatGPT (tìm kiếm web), lấy câu trả lời về rồi đóng tab.",
+  "minimum_chrome_version": "120",
+  "action": {
+    "default_title": "Brand Search Worker",
+    "default_popup": "popup.html"
+  },
+  "background": { "service_worker": "background.js" },
+  "permissions": ["storage", "alarms", "scripting", "activeTab"],
+  "host_permissions": ["http://127.0.0.1:8765/*", "http://localhost:8765/*", "https://chatgpt.com/*"]
+}

@@ -1,0 +1,21 @@
+:root { --bg: #fcfcfb; --ink: #0b0b0b; --muted: #52514e; --line: #e6e5e0; --accent: #2a78d6; --bad: #b3261e; --bad-bg: #fbe7e5; }
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #1a1a19; --ink: #f0efec; --muted: #c3c2b7; --line: #3a3936; --accent: #3987e5; --bad: #ff8a80; --bad-bg: #3d1d1a; }
+}
+body { width: 340px; margin: 0; padding: 12px 14px; font: 13px/1.45 system-ui, "Segoe UI", sans-serif;
+       background: var(--bg); color: var(--ink); }
+header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+h1 { font-size: 15px; margin: 0; }
+h2 { font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin: 12px 0 4px; }
+.switch { display: flex; align-items: center; gap: 4px; font-size: 12px; cursor: pointer; }
+dl { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; margin: 0 0 8px; }
+dt { color: var(--muted); }
+dd { margin: 0; overflow-wrap: anywhere; }
+button { width: 100%; padding: 8px 12px; border: 0; border-radius: 6px; background: var(--accent); color: #fff;
+         font: inherit; font-weight: 600; cursor: pointer; }
+button:disabled { opacity: .5; cursor: default; }
+.links { margin: 6px 0 0; }
+a { color: var(--accent); }
+.error { padding: 6px 8px; border-radius: 6px; background: var(--bad-bg); color: var(--bad); font-size: 12px; }
+.log { margin: 0; padding-left: 0; list-style: none; max-height: 180px; overflow: auto; font-size: 11px; color: var(--muted); }
+.log li { padding: 2px 0; border-bottom: 1px solid var(--line); overflow-wrap: anywhere; }
