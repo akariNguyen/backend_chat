@@ -16,6 +16,12 @@
       <span id="workers" class="pill">Đang kiểm tra worker…</span>
     </header>
 
+    <form id="auth" class="notice auth" hidden>
+      <span id="auth-message"></span>
+      <input id="key" type="password" placeholder="API key (BRAND_API_KEY trong backend\.env)" autocomplete="off">
+      <button type="submit">Lưu key</button>
+    </form>
+
     <form id="form">
       <input id="url" type="text" placeholder="https://www.example.com/" spellcheck="false" autocomplete="off" autofocus>
       <button id="go" type="submit">Tìm brand</button>

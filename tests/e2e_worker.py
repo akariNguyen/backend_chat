@@ -143,12 +143,17 @@ class FakeChatGPT(BaseHTTPRequestHandler):
         pass
 
 
+API_KEY = 'e2e-test-key'     # the backend runs like on a VPS: every /api/* call needs it
+
+
 def get(path):
-    return json.loads(urllib.request.urlopen(BACKEND + path, timeout=10).read().decode())
+    req = urllib.request.Request(BACKEND + path, headers={'X-API-Key': API_KEY})
+    return json.loads(urllib.request.urlopen(req, timeout=10).read().decode())
 
 
 def post(path, body):
-    req = urllib.request.Request(BACKEND + path, data=json.dumps(body).encode(), headers={'Content-Type': 'application/json'})
+    req = urllib.request.Request(BACKEND + path, data=json.dumps(body).encode(),
+                                 headers={'Content-Type': 'application/json', 'X-API-Key': API_KEY})
     return json.loads(urllib.request.urlopen(req, timeout=10).read().decode())
 
 
@@ -156,7 +161,8 @@ fake = ThreadingHTTPServer(('127.0.0.1', 8766), FakeChatGPT)
 threading.Thread(target=fake.serve_forever, daemon=True).start()
 db_dir = tempfile.mkdtemp()
 server = subprocess.Popen([sys.executable, 'app.py'], cwd=str(ROOT / 'backend'),
-                          env={**os.environ, 'BRAND_JOBS_DB': os.path.join(db_dir, 'e2e.sqlite3'), 'BRAND_API_PORT': str(TEST_PORT)},
+                          env={**os.environ, 'BRAND_JOBS_DB': os.path.join(db_dir, 'e2e.sqlite3'), 'BRAND_API_PORT': str(TEST_PORT),
+                               'BRAND_API_KEY': API_KEY},
                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 for _ in range(60):
     try:
@@ -172,9 +178,20 @@ try:
         worker = ctx.service_workers[0] if ctx.service_workers else ctx.wait_for_event('serviceworker', timeout=15000)
         ext_id = worker.url.split('/')[2]
         time.sleep(3)
-        print('worker online:', [(w['id'], w['status'], w['online']) for w in get('/api/workers')])
+        print('worker chưa có key -> online:', [w['id'] for w in get('/api/workers') if w['online']])
+        # what the popup's "Kết nối backend" saves (the URL is already this backend in the test copy)
+        worker.evaluate(f"chrome.storage.local.set({{apiKey: '{API_KEY}'}})")
+        time.sleep(4)
+        print('worker có key -> online:', [(w['id'], w['status']) for w in get('/api/workers') if w['online']])
 
         page = ctx.new_page()
+        page.goto(f'{BACKEND}/')
+        page.wait_for_selector('#auth:not([hidden])', timeout=15000)
+        print('trang web chưa có key -> hiện ô nhập key:', page.inner_text('#auth-message'), '| pill:', page.inner_text('#workers'))
+        page.fill('#key', API_KEY)
+        page.click('#auth button')
+        page.wait_for_function("document.getElementById('workers').textContent.includes('online')", timeout=15000)
+        print('nhập key xong -> pill:', page.inner_text('#workers'), '| ô key ẩn:', page.is_hidden('#auth'))
         for mode, url in [('newui-auto', 'https://www.vietcombank.com.vn/'), ('newui-prefill', 'https://www.paypal.com/'),
                           ('auto', 'https://www.vietcombank.com.vn/?v=old'), ('prefill', 'https://www.paypal.com/?v=old'),
                           ('empty', 'https://www.vietcombank.com.vn/?lang=en'), ('logout', 'https://www.paypal.com/signin')]:

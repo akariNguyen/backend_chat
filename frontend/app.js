@@ -8,19 +8,39 @@ const STATUS = { pending: "Chờ worker", running: "Đang hỏi ChatGPT", done: 
 let followed = null;       // id of the job shown at the top
 let onlineWorkers = 0;
 
+// The API key (when the backend sets BRAND_API_KEY) is kept in this browser only.
+const KEY_STORAGE = "brandSearchApiKey";
+function apiKey() {
+  try { return localStorage.getItem(KEY_STORAGE) || ""; } catch { return ""; }
+}
+
 async function api(method, path, body) {
-  const response = await fetch(path, {
-    method,
-    headers: body ? { "Content-Type": "application/json" } : {},
-    body: body ? JSON.stringify(body) : undefined,
-  });
+  const headers = {};
+  if (body) headers["Content-Type"] = "application/json";
+  if (apiKey()) headers["X-API-Key"] = apiKey();
+  const response = await fetch(path, { method, headers, body: body ? JSON.stringify(body) : undefined });
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
     const detail = Array.isArray(data.detail) ? data.detail.map((d) => d.msg).join("; ") : data.detail;
+    if (response.status === 401 || response.status === 403) showAuth(detail || `HTTP ${response.status}`);
     throw new Error(detail || `HTTP ${response.status}`);
   }
   return data;
 }
+
+function showAuth(message) {
+  $("auth").hidden = false;
+  $("auth-message").textContent = message;
+}
+
+$("auth").addEventListener("submit", (event) => {
+  event.preventDefault();
+  try { localStorage.setItem(KEY_STORAGE, $("key").value.trim()); } catch { /* private mode */ }
+  $("key").value = "";
+  $("auth").hidden = true;
+  refreshWorkers();
+  refreshHistory();
+});
 
 function el(tag, props = {}, children = []) {
   const node = document.createElement(tag);
@@ -48,9 +68,9 @@ async function refreshWorkers() {
       : "Chưa có worker online";
     pill.title = online.length ? online.map((w) => `${w.id} (${w.status})`).join("\n")
       : "Mở Chrome có cài extension Brand Search Worker, đăng nhập ChatGPT, bật worker trong popup.";
-  } catch {
+  } catch (err) {
     $("workers").className = "pill bad";
-    $("workers").textContent = "Mất kết nối backend";
+    $("workers").textContent = /API key|chính máy chủ/.test(err.message) ? "Cần API key" : "Mất kết nối backend";
   }
 }
 

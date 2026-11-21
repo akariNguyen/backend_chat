@@ -128,8 +128,16 @@ class JobStore:
             cancel = False
             if job_id:
                 row = self.db.execute("SELECT status, worker_id FROM jobs WHERE id=?", (job_id,)).fetchone()
-                cancel = row is None or row["status"] != "running" or row["worker_id"] != worker_id
+                # "done" right after the worker's own answer is not a cancellation
+                cancel = row is None or row["status"] in ("cancelled", "error") or row["worker_id"] != worker_id
             return {"cancel_job": cancel}
+
+    def seen(self, worker_id: str, status: str, job_id: str | None) -> None:
+        """A worker asked for a job: it is alive (keeps its last reported version)."""
+        with self.lock, self.db:
+            self.db.execute("INSERT INTO workers (id, last_seen, status, job_id) VALUES (?,?,?,?) "
+                            "ON CONFLICT(id) DO UPDATE SET last_seen=excluded.last_seen, status=excluded.status, "
+                            "job_id=excluded.job_id", (worker_id, time.time(), status, job_id))
 
     def workers(self) -> list[dict]:
         with self.lock:

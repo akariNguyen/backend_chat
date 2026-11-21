@@ -32,17 +32,41 @@ Worker làm từng việc một, gửi heartbeat 20 giây/lần (trang web hiệ
 
 ## Cài đặt
 
-Cần Python 3.11+ và Chrome 120+.
+Cần Python 3.10+ và Chrome 120+.
 
 ```powershell
-py -3.13 -m pip install -r backend\requirements.txt
+python -m pip install -r backend\requirements.txt
 cd backend
-py -3.13 app.py            # http://127.0.0.1:8765  (API docs: /docs)
+python app.py               # http://127.0.0.1:8765  (API docs: /docs)
 ```
 
 Extension: `chrome://extensions` → bật **Developer mode** → **Load unpacked** → chọn thư mục `extension/`.
 Nên dùng một hồ sơ Chrome riêng, đã đăng nhập ChatGPT, vì worker tự mở và đóng tab. Popup của extension
 có công tắc bật/tắt worker, trạng thái, nhật ký và nút **Tra brand trang này**.
+
+## Deploy lên VPS (máy khác dùng chung)
+
+Backend chạy trên VPS; trang web mở từ máy bất kỳ; worker là Chrome có extension ở máy bất kỳ
+(kể cả trên chính VPS), miễn là đã đăng nhập ChatGPT.
+
+1. Trên VPS:
+   ```powershell
+   git clone https://github.com/akariNguyen/backend_chat.git C:\backend_chat
+   cd C:\backend_chat
+   python -m pip install -r backend\requirements.txt
+   Copy-Item backend\.env.example backend\.env          # BRAND_API_HOST=0.0.0.0: nhận máy khác
+   New-NetFirewallRule -DisplayName "Brand Search 8765" -Direction Inbound -Protocol TCP -LocalPort 8765 -Action Allow
+   cd backend
+   python app.py
+   ```
+   Nếu nhà cung cấp VPS có tường lửa riêng (security group), mở thêm cổng 8765 ở đó.
+2. Trang web: mở `http://<IP-VPS>:8765`.
+3. Worker: popup extension → **Kết nối backend** → URL `http://<IP-VPS>:8765` (API key để trống) → **Lưu & kiểm tra**.
+
+Mặc định không cần key: máy nào vào được `IP-VPS:8765` cũng tạo được việc (dùng tài khoản ChatGPT của worker)
+và xem lịch sử. Muốn hạn chế mà vẫn không dùng key, chỉ mở cổng cho IP các máy của mình:
+`New-NetFirewallRule ... -LocalPort 8765 -RemoteAddress 1.2.3.4,5.6.7.8 -Action Allow`. Muốn dùng key: điền
+`BRAND_API_KEY` trong `backend\.env`, chạy lại backend; trang web sẽ hỏi key, popup có ô API key.
 
 ## Dùng
 
@@ -64,18 +88,19 @@ Mở http://127.0.0.1:8765, nhập URL, bấm **Tìm brand**. Có thể mở th�
 
 ## Cấu hình
 
-- Cổng `8765`: `BRAND_API_PORT` khi chạy backend; trong extension sửa `BACKEND_URL` ở `background.js`,
-  `popup.js` và `host_permissions` ở `manifest.json`.
+- `backend\.env` (mẫu: `backend\.env.example`, không đưa lên git): `BRAND_API_HOST` (`127.0.0.1` = chỉ máy
+  này, `0.0.0.0` = nhận máy khác), `BRAND_API_PORT` (8765), `BRAND_API_KEY`, `BRAND_JOBS_DB`.
+- `BRAND_API_KEY` (tùy chọn, mặc định để trống = không cần key): khi đặt, mọi route `/api/*` cần header
+  `X-API-Key`; trang web, `/health`, `/docs` vẫn mở.
+- Extension: URL backend (và API key nếu có) đặt trong popup (**Kết nối backend**), mặc định `http://127.0.0.1:8765`.
 - `extension/background.js`: `OPEN_IN_BACKGROUND` (mở tab ChatGPT mà không chuyển sang), `JOB_TIMEOUT_MS`,
   `PAUSE_BETWEEN_JOBS_MS`.
-- `BRAND_JOBS_DB`: đường dẫn file SQLite (mặc định `backend/brand_jobs.sqlite3`, không đưa lên git).
-- Backend chỉ nghe `127.0.0.1` và chưa có xác thực: không mở ra mạng ngoài.
 
 ## Test
 
 ```powershell
-py -3.13 tests\test_backend.py     # offline, ~10 giây
-py -3.13 tests\e2e_worker.py       # cần playwright + chromium; dùng cổng 8775 và 8766, ChatGPT giả
+python tests\test_backend.py     # offline, ~15 giây
+python tests\e2e_worker.py       # cần playwright + chromium; dùng cổng 8775 và 8766, ChatGPT giả
 ```
 
 ## Lưu ý

@@ -9,6 +9,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'backend'))
 import os, tempfile                                   # noqa: E401,E402
 _TMP_DB = os.path.join(tempfile.mkdtemp(), 'jobs_test.sqlite3')
 os.environ['BRAND_JOBS_DB'] = _TMP_DB                 # never touch the real brand_jobs.sqlite3
+os.environ['BRAND_API_KEY'] = 'test-key'               # every /api/* call below sends it
 import httpx                                          # noqa: E402
 import jobs                                           # noqa: E402
 import safe_http, lookup, app as app_module           # noqa: E402
@@ -80,7 +81,7 @@ ANSWER = dict(brand_name='PayPal', organization='PayPal Holdings, Inc.', aliases
 COPIED = ("Here is the result {as requested}:\n\n```json\n" + json.dumps(ANSWER, ensure_ascii=False, indent=2)
           + "\n```\n\n([Wikipedia](https://en.wikipedia.org/wiki/PayPal))")
 
-with TestClient(app_module.app) as client:
+with TestClient(app_module.app, headers={'X-API-Key': 'test-key'}) as client:
     h = client.get('/health').json()
     ok(h.get('service') == 'brand-search', f'/health {h}')
 
@@ -198,5 +199,23 @@ with TestClient(app_module.app) as client:
                              '"is_official_site": null, "logo_urls": [], "description": "", "confidence": "LOW", '
                              '"reasoning": "", "sources": []}\nAnswer:\n' + json.dumps(ANSWER))
     ok(pa.brand_name == 'PayPal', f'bỏ JSON mẫu trong câu hỏi, lấy JSON trả lời -> {pa.brand_name}')
+
+    # ---- API key (deploy on a VPS)
+    ok(client.get('/api/jobs', headers={'X-API-Key': ''}).status_code == 401, 'thiếu API key -> 401')
+    ok(client.get('/api/jobs', headers={'X-API-Key': 'sai'}).status_code == 401, 'sai API key -> 401')
+    ok(client.get('/health', headers={'X-API-Key': ''}).status_code == 200 and client.get('/', headers={'X-API-Key': ''}).status_code == 200,
+       '/health và trang web không cần key')
+    r = client.options('/api/jobs', headers={'Origin': 'chrome-extension://abcdefghijklmnopabcdefghijklmnop',
+                                             'Access-Control-Request-Method': 'POST',
+                                             'Access-Control-Request-Headers': 'x-api-key,content-type'})
+    ok(r.status_code == 200 and 'x-api-key' in r.headers.get('access-control-allow-headers', '').lower(),
+       'preflight của extension cho phép header X-API-Key')
+    os.environ['BRAND_API_KEY'] = ''
+    r = client.get('/api/jobs', headers={'X-API-Key': ''})   # TestClient's address is "testclient", another machine
+    ok(r.status_code == 200, f"không đặt key -> máy khác dùng được không cần key ({r.status_code})")
+    os.environ['BRAND_API_KEY'] = 'test-key'
+    ok(app_module._is_loopback('127.0.0.1') and app_module._is_loopback('::1') and not app_module._is_loopback('203.0.113.5'),
+       'nhận diện địa chỉ của chính máy chủ')
+
 
 print(f'\n{sum(results)}/{len(results)} PASS')

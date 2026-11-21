@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Brand Search Worker (BKB)",
-  "version": "4.0.0",
+  "version": "5.0.0",
   "description": "Worker: nhận việc tra brand từ backend, mở ChatGPT (tìm kiếm web), lấy câu trả lời về rồi đóng tab.",
   "minimum_chrome_version": "120",
   "action": {

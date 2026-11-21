@@ -5,16 +5,29 @@ profile logged in to ChatGPT claims the job, opens ChatGPT with the prompt (web 
 answer back and closes the tab. The backend turns the answer into checked data (logos, official domains).
 No OpenAI API key is used.
 
-Run (from this backend/ folder):  py -3.13 app.py   -> http://127.0.0.1:8765, API docs at /docs
+Run (from this backend/ folder):  python app.py   -> http://127.0.0.1:8765, API docs at /docs
+
+Settings (environment or backend/.env):
+  BRAND_API_HOST  127.0.0.1 (default, this machine only) or 0.0.0.0 to accept other machines
+  BRAND_API_PORT  8765
+  BRAND_API_KEY   optional; when set, every /api/* route requires it (header X-API-Key).
+                  Empty = no key: anyone who can reach the port can use the API.
+  BRAND_JOBS_DB   path of the SQLite job history (default backend/brand_jobs.sqlite3)
 """
+import ipaddress
 import os
+import secrets
 from contextlib import asynccontextmanager
 from pathlib import Path
 
+from dotenv import load_dotenv
+
+load_dotenv(Path(__file__).resolve().parent / ".env")
+
 import httpx
-from fastapi import FastAPI, HTTPException, Query, Response
+from fastapi import FastAPI, HTTPException, Query, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
@@ -25,6 +38,13 @@ WEB_DIR = Path(__file__).resolve().parent.parent / "frontend"     # the web page
 WORKER_ID = r"^[A-Za-z0-9_.-]{1,64}$"
 
 
+def _is_loopback(host: str) -> bool:
+    try:
+        return ipaddress.ip_address(host).is_loopback
+    except ValueError:
+        return host == "localhost"
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     app.state.jobs = jobs.JobStore(Path(os.environ.get("BRAND_JOBS_DB", jobs.DB_PATH)))
@@ -33,12 +53,26 @@ async def lifespan(app: FastAPI):
         yield
 
 
-app = FastAPI(title="Brand Search API", version="4.0.0", lifespan=lifespan)
+app = FastAPI(title="Brand Search API", version="5.0.0", lifespan=lifespan)
 app.mount("/static", StaticFiles(directory=WEB_DIR), name="static")
+
+
+# Optional key: when BRAND_API_KEY is set, every /api/* route needs it; the page, /health and /docs stay open.
+@app.middleware("http")
+async def require_api_key(request: Request, call_next):
+    key = os.environ.get("BRAND_API_KEY", "").strip()
+    if key and request.url.path.startswith("/api/"):
+        given = request.headers.get("x-api-key", "")
+        if not secrets.compare_digest(given.encode(), key.encode()):
+            return JSONResponse({"detail": "Sai hoặc thiếu API key (header X-API-Key)"}, status_code=401)
+    return await call_next(request)
+
+
+# Added last = runs first, so preflight requests are answered before the key check.
 # The page is same-origin; from other origins only browser extensions (the worker) may call the API.
 app.add_middleware(CORSMiddleware,
                    allow_origin_regex=r"^(chrome-extension://[a-p]{32}|moz-extension://[0-9a-f-]{36})$",
-                   allow_methods=["GET", "POST"], allow_headers=["Content-Type"])
+                   allow_methods=["GET", "POST"], allow_headers=["Content-Type", "X-API-Key"])
 
 
 # ---------------------------------------------------------------- models
@@ -223,6 +257,7 @@ async def list_workers():
 @app.get("/api/worker/next", response_model=WorkerJob, responses={204: {"description": "no job waiting"}})
 async def next_job(worker_id: str = Query(pattern=WORKER_ID)):
     job = app.state.jobs.claim(worker_id)
+    app.state.jobs.seen(worker_id, "busy" if job else "idle", job["id"] if job else None)
     if not job:
         return Response(status_code=204)
     return WorkerJob(id=job["id"], url=job["url"], prompt=job["prompt"])
@@ -273,5 +308,11 @@ async def parse_chatgpt_answer(request: ParseRequest):
 
 if __name__ == "__main__":
     import uvicorn
-    # Keep the port in sync with BACKEND_URL in the extension (background.js, popup.js, manifest.json).
-    uvicorn.run(app, host="127.0.0.1", port=int(os.environ.get("BRAND_API_PORT", "8765")))
+    host = os.environ.get("BRAND_API_HOST", "127.0.0.1").strip()
+    port = int(os.environ.get("BRAND_API_PORT", "8765"))
+    if os.environ.get("BRAND_API_KEY", "").strip():
+        print("API key: bật (trang web và extension phải nhập đúng key)")
+    elif not _is_loopback(host):
+        print(f"Không có API key: máy nào truy cập được {host}:{port} cũng dùng được. "
+              "Nên giới hạn IP được vào cổng này trong tường lửa.")
+    uvicorn.run(app, host=host, port=port)

@@ -53,6 +53,8 @@ details { margin-top: 12px; }
 pre { overflow: auto; max-height: 360px; padding: 12px; border-radius: 8px; background: var(--soft); font-size: 12px; white-space: pre-wrap; }
 
 .top { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.auth { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 16px; }
+.auth span { flex-basis: 100%; color: var(--bad); }
 .pill { flex: none; padding: 4px 12px; border-radius: 999px; font-size: 13px; font-weight: 600; background: var(--soft); color: var(--muted); }
 .pill.good { background: var(--good-bg); color: var(--good); }
 .pill.bad { background: var(--bad-bg); color: var(--bad); }

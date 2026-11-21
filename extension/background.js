@@ -2,7 +2,7 @@
 //   poll the backend queue every few seconds -> claim one job -> open a ChatGPT tab with the prompt
 //   (web search on) -> inject engine_chatgpt.js -> wait for the answer -> send it back -> close the tab.
 // One job at a time, with a pause between jobs. The popup turns the worker on and off.
-const BACKEND_URL = "http://127.0.0.1:8765";       // keep in sync with manifest.json and popup.js
+const DEFAULT_BACKEND_URL = "http://127.0.0.1:8765";   // the popup's "Kết nối backend" overrides it
 const CHATGPT_URL = "https://chatgpt.com/";
 const POLL_MS = 3000;
 const HEARTBEAT_MS = 20000;                         // also keeps the service worker alive
@@ -40,20 +40,31 @@ async function setState(patch) {
   await chrome.storage.local.set({ workerState: { ...workerState, ...patch, updatedAt: Date.now() } });
 }
 
+// Backend address and API key, set in the popup (a VPS: http://<ip>:8765 + the key from backend\.env).
+async function connection() {
+  const { backendUrl, apiKey } = await chrome.storage.local.get(["backendUrl", "apiKey"]);
+  return { backendUrl: (backendUrl || DEFAULT_BACKEND_URL).replace(/\/+$/, ""), apiKey: apiKey || "" };
+}
+
 // fetch with a timeout: a hung request must never block the worker.
 async function api(method, path, body, timeoutMs = 60000) {
+  const { backendUrl, apiKey } = await connection();
+  const headers = {};
+  if (body) headers["Content-Type"] = "application/json";
+  if (apiKey) headers["X-API-Key"] = apiKey;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const response = await fetch(BACKEND_URL + path, {
-      method,
-      headers: body ? { "Content-Type": "application/json" } : {},
-      body: body ? JSON.stringify(body) : undefined,
-      signal: controller.signal,
+    const response = await fetch(backendUrl + path, {
+      method, headers, body: body ? JSON.stringify(body) : undefined, signal: controller.signal,
     });
     const data = response.status === 204 ? null : await response.json().catch(() => null);
     if (!response.ok) throw new Error(data?.detail ? String(data.detail) : `HTTP ${response.status}`);
     return data;
+  } catch (err) {
+    if (err.name === "AbortError") throw new Error(`${backendUrl} không trả lời`);
+    if (err instanceof TypeError) throw new Error(`Không kết nối được ${backendUrl}`);
+    throw err;
   } finally {
     clearTimeout(timer);
   }
@@ -192,6 +203,14 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     return true;
   }
   return false;
+});
+
+// New backend URL or API key saved in the popup: report in right away.
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area === "local" && (changes.backendUrl || changes.apiKey)) {
+    lastBackendError = null;
+    heartbeat().then(poll);
+  }
 });
 
 chrome.alarms.create("brand-worker", { periodInMinutes: 1 });      // wakes the worker if Chrome stopped it
